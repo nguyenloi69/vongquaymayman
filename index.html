@@ -311,7 +311,7 @@
             if (isRigged) {
                 // Random 1 số từ 1 đến 100
                 const rand = Math.floor(Math.random() * 100) + 1;
-                let wantKhongDi = rand <= 90; // 90% ra Không Đi
+                let wantKhongDi = rand <= 60; // 90% ra Không Đi
 
                 // Lọc ra các index của "Không Đi" và "Đi"
                 const khongDiIndices = entries.map((e, i) => e === "Không Đi" ? i : -1).filter(i => i !== -1);
