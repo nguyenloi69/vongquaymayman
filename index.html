@@ -24,7 +24,6 @@
             overflow: hidden;
         }
 
-        /* Popup Styles */
         #overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -70,7 +69,6 @@
             background: #3a56d4;
         }
 
-        /* Layout */
         .main-content {
             flex: 1;
             display: flex;
@@ -87,7 +85,6 @@
             flex-direction: column;
         }
 
-        /* Wheel Container */
         .wheel-container {
             position: relative;
             width: 500px;
@@ -110,8 +107,9 @@
             height: 0;
             border-top: 20px solid transparent;
             border-bottom: 20px solid transparent;
-            border-right: 35px solid #e63946;
+            border-right: 35px solid #ffca28;
             z-index: 10;
+            filter: drop-shadow(0px 0px 5px rgba(0,0,0,0.5));
         }
 
         .spin-btn {
@@ -119,8 +117,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             background: white;
             border-radius: 50%;
             display: flex;
@@ -131,7 +129,7 @@
             z-index: 5;
             color: #333;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             box-shadow: 0 0 10px rgba(0,0,0,0.3);
             text-align: center;
             user-select: none;
@@ -141,7 +139,6 @@
             transform: translate(-50%, -50%) scale(0.95);
         }
 
-        /* Sidebar Styles */
         .tabs {
             display: flex;
             border-bottom: 1px solid #444;
@@ -188,7 +185,6 @@
 </head>
 <body>
 
-    <!-- Popup nhập tên -->
     <div id="overlay">
         <div class="popup">
             <h3>Chào mừng bạn!</h3>
@@ -208,7 +204,7 @@
 
     <div class="sidebar">
         <div class="tabs">
-            <div class="tab active" id="tab-entries" onclick="switchTab('entries')">Thành phần (8)</div>
+            <div class="tab active" id="tab-entries" onclick="switchTab('entries')">Thành phần (20)</div>
             <div class="tab" id="tab-results" onclick="switchTab('results')">Kết quả (0)</div>
         </div>
         
@@ -216,14 +212,11 @@
         <div class="content-area hidden" id="results-area"></div>
     </div>
 
-    <!-- 1. TẢI FIREBASE SDK (Phiên bản 8 - tương thích HTML tĩnh dễ nhất) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script>
-        // 2. CẤU HÌNH FIREBASE CỦA BOSS Ở ĐÂY
-        // Hướng dẫn lấy cấu hình xem ở phần chat của AI
-       const firebaseConfig = {
+        const firebaseConfig = {
 		  apiKey: "AIzaSyDZESO1rncITqGjZXbtf3H6Fu5JW7kKa8Q",
 		  authDomain: "vong-quay-may-man-6443e.firebaseapp.com",
 		  projectId: "vong-quay-may-man-6443e",
@@ -232,15 +225,20 @@
 		  appId: "1:950496540203:web:180809ed9b2d2c88a91c6e"
 		};
 
-        // Khởi tạo Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.database();
 
-        // Cấu hình vòng quay
-        const entries = ["Ali", "Beatriz", "Charles", "Diya", "Eric", "Fatima", "Gabriel", "Hanna"];
-        const colors = ["#4361ee", "#e63946", "#f4a261", "#2a9d8f", "#4361ee", "#e63946", "#f4a261", "#2a9d8f"];
+        // TẠO 10 ĐI và 10 KHÔNG ĐI
+        const entries = [];
+        const colors = [];
+        for (let i = 0; i < 10; i++) {
+            entries.push("Đi");
+            colors.push("#2a9d8f"); // Màu xanh
+            entries.push("Không Đi");
+            colors.push("#e63946"); // Màu đỏ
+        }
         
         let currentUser = "";
         let spinHistory = [];
@@ -284,15 +282,15 @@
                 ctx.fill();
                 ctx.closePath();
                 ctx.strokeStyle = "#333";
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1;
                 ctx.stroke();
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(angle + arc / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#fff";
-                ctx.font = "bold 24px Arial";
-                ctx.fillText(entries[i], radius - 30, 10);
+                ctx.font = "bold 16px Arial"; // Giảm size chữ vì 20 ô khá hẹp
+                ctx.fillText(entries[i], radius - 20, 6);
                 ctx.restore();
             }
         }
@@ -300,9 +298,51 @@
         function spinWheel() {
             if (isSpinning) return;
             isSpinning = true;
+            
+            const numSegments = entries.length;
+            const arc = (2 * Math.PI) / numSegments;
+            
+            // LOGIC "CAN THIỆP" KẾT QUẢ TỈ LỆ 90% KHÔNG ĐI CHO LỢI VÀ TRÂM
+            let targetIndex;
+            const lowerName = currentUser.toLowerCase();
+            const isRigged = lowerName.includes("lợi") || lowerName.includes("loi") || 
+                             lowerName.includes("trâm") || lowerName.includes("tram");
+
+            if (isRigged) {
+                // Random 1 số từ 1 đến 100
+                const rand = Math.floor(Math.random() * 100) + 1;
+                let wantKhongDi = rand <= 90; // 90% ra Không Đi
+
+                // Lọc ra các index của "Không Đi" và "Đi"
+                const khongDiIndices = entries.map((e, i) => e === "Không Đi" ? i : -1).filter(i => i !== -1);
+                const diIndices = entries.map((e, i) => e === "Đi" ? i : -1).filter(i => i !== -1);
+
+                if (wantKhongDi) {
+                    targetIndex = khongDiIndices[Math.floor(Math.random() * khongDiIndices.length)];
+                } else {
+                    targetIndex = diIndices[Math.floor(Math.random() * diIndices.length)];
+                }
+            } else {
+                // Người bình thường quay ngẫu nhiên hoàn toàn
+                targetIndex = Math.floor(Math.random() * numSegments);
+            }
+
+            // Tính toán góc quay cần thiết để rơi vào đúng targetIndex
+            // Tâm của ô targetIndex
+            const targetWinningAngle = targetIndex * arc + (arc / 2); 
+            let targetNormalizedRotation = (2 * Math.PI - targetWinningAngle) % (2 * Math.PI);
+            if (targetNormalizedRotation < 0) targetNormalizedRotation += 2 * Math.PI;
+
+            // Góc cần quay thêm so với vị trí hiện tại
+            let currentRemainder = currentRotation % (2 * Math.PI);
+            let angleDiff = targetNormalizedRotation - currentRemainder;
+            if (angleDiff <= 0) angleDiff += 2 * Math.PI; 
+
+            // Cố định quay thêm 10 vòng cho đẹp
+            const spins = 10;
+            const totalRotation = currentRotation + angleDiff + (spins * 2 * Math.PI);
+            
             const spinTime = 4000;
-            const randomExtraAngles = Math.random() * 360; 
-            const totalRotation = currentRotation + (Math.PI * 2 * 10) + (randomExtraAngles * Math.PI / 180);
             let startTime = null;
 
             function animate(currentTime) {
@@ -314,47 +354,32 @@
                     drawWheel();
                     requestAnimationFrame(animate);
                 } else {
-                    currentRotation = totalRotation % (Math.PI * 2);
+                    currentRotation = totalRotation;
                     drawWheel();
                     isSpinning = false;
-                    determineWinner();
+                    // Lấy kết quả từ targetIndex đã sắp xếp
+                    saveResult(entries[targetIndex]);
                 }
             }
             requestAnimationFrame(animate);
         }
 
-        function determineWinner() {
-            const numSegments = entries.length;
-            const arc = (2 * Math.PI) / numSegments;
-            let normalizedRotation = currentRotation % (2 * Math.PI);
-            if (normalizedRotation < 0) normalizedRotation += 2 * Math.PI;
-            let winningAngle = (2 * Math.PI - normalizedRotation) % (2 * Math.PI);
-            let winningIndex = Math.floor(winningAngle / arc);
-            const winner = entries[winningIndex];
-            saveResult(winner);
-        }
-
         // ==========================================
-        // FIREBASE LOGIC: ĐỒNG BỘ THỜI GIAN THỰC
+        // FIREBASE LOGIC
         // ==========================================
 
         function loadHistory() {
-            // Lắng nghe sự kiện khi có dữ liệu thay đổi trên Firebase
             db.ref('wheel_history').on('value', (snapshot) => {
                 const data = snapshot.val();
-                spinHistory = []; // Xóa cũ
+                spinHistory = []; 
                 if (data) {
-                    // Firebase trả về Object dạng { id1: {...}, id2: {...} }
-                    // Chuyển Object thành Array
                     const keys = Object.keys(data);
                     keys.forEach(key => {
                         spinHistory.push(data[key]);
                     });
-                    // Đảo ngược mảng để kết quả mới nhất nằm lên đầu
                     spinHistory.reverse(); 
                 }
                 
-                // Cập nhật lại giao diện ngay khi dữ liệu thay đổi
                 if (document.getElementById('tab-results').classList.contains('active')) {
                     renderResults();
                 }
@@ -369,10 +394,9 @@
                 time: new Date().toLocaleTimeString('vi-VN')
             };
             
-            // Đẩy dữ liệu lên Firebase thay vì localStorage
             db.ref('wheel_history').push(resultData)
                 .then(() => {
-                    alert(`Chúc mừng! Bạn đã quay trúng: ${prize}`);
+                    alert(`Kết quả quay: ${prize}`);
                     switchTab('results');
                 })
                 .catch((error) => {
@@ -399,12 +423,17 @@
         function renderEntries() {
             const area = document.getElementById("entries-area");
             area.innerHTML = "";
-            entries.forEach(name => {
-                const div = document.createElement("div");
-                div.className = "list-item";
-                div.textContent = name;
-                area.appendChild(div);
-            });
+            
+            // Thu gọn danh sách hiển thị
+            const div1 = document.createElement("div");
+            div1.className = "list-item";
+            div1.innerHTML = `<span style="color:#2a9d8f; font-weight:bold;">Đi</span> (Số lượng: 10 ô)`;
+            area.appendChild(div1);
+
+            const div2 = document.createElement("div");
+            div2.className = "list-item";
+            div2.innerHTML = `<span style="color:#e63946; font-weight:bold;">Không Đi</span> (Số lượng: 10 ô)`;
+            area.appendChild(div2);
         }
 
         function renderResults() {
@@ -413,9 +442,13 @@
             spinHistory.forEach(item => {
                 const div = document.createElement("div");
                 div.className = "result-item";
+                
+                // Đổi màu prize cho đẹp
+                const prizeColor = item.prize === "Đi" ? "#2a9d8f" : "#e63946";
+                
                 div.innerHTML = `
-                    <span class="result-name">${item.user}</span> đã quay lúc ${item.time}<br>
-                    Kết quả: <span class="result-prize">${item.prize}</span>
+                    <span class="result-name">${item.user}</span> lúc ${item.time}<br>
+                    Kết quả: <span class="result-prize" style="color:${prizeColor}">${item.prize}</span>
                 `;
                 area.appendChild(div);
             });
