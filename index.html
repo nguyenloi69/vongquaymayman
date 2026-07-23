@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay May Mắn - Firebase</title>
+    <style>
+        :root {
+            --bg-color: #2b2b36;
+            --sidebar-bg: #1e1e24;
+            --text-color: #ffffff;
+            --primary: #4361ee;
+            --wheel-border: #333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Popup Styles */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .popup {
+            background: var(--sidebar-bg);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 300px;
+        }
+
+        .popup input {
+            width: 90%;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #2b2b36;
+            color: white;
+            font-size: 16px;
+        }
+
+        .popup button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        .popup button:hover {
+            background: #3a56d4;
+        }
+
+        /* Layout */
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .sidebar {
+            width: 350px;
+            background-color: var(--sidebar-bg);
+            border-left: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Wheel Container */
+        .wheel-container {
+            position: relative;
+            width: 500px;
+            height: 500px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .pointer {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 20px solid transparent;
+            border-bottom: 20px solid transparent;
+            border-right: 35px solid #e63946;
+            z-index: 10;
+        }
+
+        .spin-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 5;
+            color: #333;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            text-align: center;
+            user-select: none;
+        }
+
+        .spin-btn:active {
+            transform: translate(-50%, -50%) scale(0.95);
+        }
+
+        /* Sidebar Styles */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #444;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            background: #222;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            font-weight: bold;
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+            font-size: 14px;
+        }
+
+        .result-item {
+            background: #2b2b36;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .result-name { font-weight: bold; color: #4db8ff; }
+        .result-prize { font-weight: bold; color: #ffca28; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Popup nhập tên -->
+    <div id="overlay">
+        <div class="popup">
+            <h3>Chào mừng bạn!</h3>
+            <p>Vui lòng nhập tên để tiếp tục</p>
+            <input type="text" id="playerName" placeholder="Nhập tên của bạn..." autocomplete="off">
+            <button onclick="startGame()">Vào Quay</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="wheel-container">
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+            <div class="pointer"></div>
+            <div class="spin-btn" onclick="spinWheel()">Click<br>to spin</div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="tabs">
+            <div class="tab active" id="tab-entries" onclick="switchTab('entries')">Thành phần (8)</div>
+            <div class="tab" id="tab-results" onclick="switchTab('results')">Kết quả (0)</div>
+        </div>
+        
+        <div class="content-area" id="entries-area"></div>
+        <div class="content-area hidden" id="results-area"></div>
+    </div>
+
+    <!-- 1. TẢI FIREBASE SDK (Phiên bản 8 - tương thích HTML tĩnh dễ nhất) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        // 2. CẤU HÌNH FIREBASE CỦA BOSS Ở ĐÂY
+        // Hướng dẫn lấy cấu hình xem ở phần chat của AI
+       const firebaseConfig = {
+		  apiKey: "AIzaSyDZESO1rncITqGjZXbtf3H6Fu5JW7kKa8Q",
+		  authDomain: "vong-quay-may-man-6443e.firebaseapp.com",
+		  projectId: "vong-quay-may-man-6443e",
+		  storageBucket: "vong-quay-may-man-6443e.firebasestorage.app",
+		  messagingSenderId: "950496540203",
+		  appId: "1:950496540203:web:180809ed9b2d2c88a91c6e"
+		};
+
+        // Khởi tạo Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // Cấu hình vòng quay
+        const entries = ["Ali", "Beatriz", "Charles", "Diya", "Eric", "Fatima", "Gabriel", "Hanna"];
+        const colors = ["#4361ee", "#e63946", "#f4a261", "#2a9d8f", "#4361ee", "#e63946", "#f4a261", "#2a9d8f"];
+        
+        let currentUser = "";
+        let spinHistory = [];
+        let currentRotation = 0;
+        let isSpinning = false;
+        
+        const canvas = document.getElementById("wheelCanvas");
+        const ctx = canvas.getContext("2d");
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = canvas.width / 2;
+
+        function init() {
+            loadHistory();
+            drawWheel();
+            renderEntries();
+            updateTabs();
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById("playerName").value.trim();
+            if (nameInput === "") {
+                alert("Vui lòng nhập tên của bạn!");
+                return;
+            }
+            currentUser = nameInput;
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        function drawWheel() {
+            const numSegments = entries.length;
+            const arc = (2 * Math.PI) / numSegments;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < numSegments; i++) {
+                const angle = currentRotation + i * arc;
+                ctx.beginPath();
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + arc);
+                ctx.lineTo(centerX, centerY);
+                ctx.fill();
+                ctx.closePath();
+                ctx.strokeStyle = "#333";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 24px Arial";
+                ctx.fillText(entries[i], radius - 30, 10);
+                ctx.restore();
+            }
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            const spinTime = 4000;
+            const randomExtraAngles = Math.random() * 360; 
+            const totalRotation = currentRotation + (Math.PI * 2 * 10) + (randomExtraAngles * Math.PI / 180);
+            let startTime = null;
+
+            function animate(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const progress = currentTime - startTime;
+                if (progress < spinTime) {
+                    const easeOutProgress = 1 - Math.pow(1 - (progress / spinTime), 3);
+                    currentRotation = totalRotation * easeOutProgress;
+                    drawWheel();
+                    requestAnimationFrame(animate);
+                } else {
+                    currentRotation = totalRotation % (Math.PI * 2);
+                    drawWheel();
+                    isSpinning = false;
+                    determineWinner();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function determineWinner() {
+            const numSegments = entries.length;
+            const arc = (2 * Math.PI) / numSegments;
+            let normalizedRotation = currentRotation % (2 * Math.PI);
+            if (normalizedRotation < 0) normalizedRotation += 2 * Math.PI;
+            let winningAngle = (2 * Math.PI - normalizedRotation) % (2 * Math.PI);
+            let winningIndex = Math.floor(winningAngle / arc);
+            const winner = entries[winningIndex];
+            saveResult(winner);
+        }
+
+        // ==========================================
+        // FIREBASE LOGIC: ĐỒNG BỘ THỜI GIAN THỰC
+        // ==========================================
+
+        function loadHistory() {
+            // Lắng nghe sự kiện khi có dữ liệu thay đổi trên Firebase
+            db.ref('wheel_history').on('value', (snapshot) => {
+                const data = snapshot.val();
+                spinHistory = []; // Xóa cũ
+                if (data) {
+                    // Firebase trả về Object dạng { id1: {...}, id2: {...} }
+                    // Chuyển Object thành Array
+                    const keys = Object.keys(data);
+                    keys.forEach(key => {
+                        spinHistory.push(data[key]);
+                    });
+                    // Đảo ngược mảng để kết quả mới nhất nằm lên đầu
+                    spinHistory.reverse(); 
+                }
+                
+                // Cập nhật lại giao diện ngay khi dữ liệu thay đổi
+                if (document.getElementById('tab-results').classList.contains('active')) {
+                    renderResults();
+                }
+                updateTabs();
+            });
+        }
+
+        function saveResult(prize) {
+            const resultData = {
+                user: currentUser,
+                prize: prize,
+                time: new Date().toLocaleTimeString('vi-VN')
+            };
+            
+            // Đẩy dữ liệu lên Firebase thay vì localStorage
+            db.ref('wheel_history').push(resultData)
+                .then(() => {
+                    alert(`Chúc mừng! Bạn đã quay trúng: ${prize}`);
+                    switchTab('results');
+                })
+                .catch((error) => {
+                    alert("Có lỗi xảy ra khi lưu kết quả!");
+                    console.error(error);
+                });
+        }
+
+        function switchTab(tab) {
+            if (tab === 'entries') {
+                document.getElementById('tab-entries').classList.add('active');
+                document.getElementById('tab-results').classList.remove('active');
+                document.getElementById('entries-area').classList.remove('hidden');
+                document.getElementById('results-area').classList.add('hidden');
+            } else {
+                document.getElementById('tab-results').classList.add('active');
+                document.getElementById('tab-entries').classList.remove('active');
+                document.getElementById('results-area').classList.remove('hidden');
+                document.getElementById('entries-area').classList.add('hidden');
+                renderResults(); 
+            }
+        }
+
+        function renderEntries() {
+            const area = document.getElementById("entries-area");
+            area.innerHTML = "";
+            entries.forEach(name => {
+                const div = document.createElement("div");
+                div.className = "list-item";
+                div.textContent = name;
+                area.appendChild(div);
+            });
+        }
+
+        function renderResults() {
+            const area = document.getElementById("results-area");
+            area.innerHTML = "";
+            spinHistory.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "result-item";
+                div.innerHTML = `
+                    <span class="result-name">${item.user}</span> đã quay lúc ${item.time}<br>
+                    Kết quả: <span class="result-prize">${item.prize}</span>
+                `;
+                area.appendChild(div);
+            });
+        }
+
+        function updateTabs() {
+            document.getElementById("tab-entries").textContent = `Thành phần (${entries.length})`;
+            document.getElementById("tab-results").textContent = `Kết quả (${spinHistory.length})`;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
